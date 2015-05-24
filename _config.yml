@@ -12,6 +12,7 @@ news:
     feed: /news.xml
 
 url: "http://neovim.io"
+baseurl: "/neovim.github.io"
 
 gems:
     - jekyll-redirect-from
