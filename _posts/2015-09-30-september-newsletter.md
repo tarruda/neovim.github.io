@@ -1,0 +1,274 @@
+---
+layout: newsletter
+title: "Newsletter #6 - Ship it!"
+category: newsletter
+permalink: /news/2015/september/
+---
+
+Welcome to the sixth newsletter for Neovim, a project that aims to improve Vim
+by adding [new features][terminal-emulator] and wrap it all in a nice, modern
+face.
+
+### Introduction
+
+Hi, this is @tarruda and I will be addressing the Neovim community directly in
+this newsletter. Other than that, I will try to keep it structured as @jdavis
+did previously. Let's get started!
+
+## General News
+
+### 0.1 release
+
+Neovim now has its first public release!
+
+A few months ago, @justinmk created the [0.1 milestone][0.1-milestone] which
+greatly helped us focus on more urgent tasks that resulted in the first release.
+We planned many features not yet available in 0.1, but decided to postpone them
+for future milestones, which will be more frequent after this newsletter.
+
+This illustrates the path Neovim will take for now on: Instead of preparing
+big releases that take forever to happen, we'll focus on smaller, frequent and
+more stable releases.
+
+The 0.1 release is basically just a tag that users looking to compile Neovim in
+a version that has a minimum level of stability, but future releases may also
+contain precompiled binaries and even installers(when Windows is officially
+supported)
+
+### Bountysource salt campaign
+
+For those who don't know yet, Bountysource launched a new platform that allows
+open source projects to obtain sustainable crowdfunding. This platform is
+conveniently called ["salt"][history-of-salt], and Neovim was one of the first
+projects to use it.
+
+The [first campaign][first-campaign] was very
+successful and raised about $35,000, which allowed me to work full-time on
+Neovim for roughly 6 months. Being very enthusiastic about the project and
+unable to meet all goals in those months, I continued to dedicate a very
+significant portion of my time to Neovim, so much that it started hurting my
+personal and professional life. This continued until February when I saw that I
+simply couldn't continue with my old pace. Around that time that @rappo offered
+me to test the salt platform beta version and I saw it as a way to continue my
+work on Neovim.
+
+Like it's predecessor, [the salt campaign][salt-campaign] was very successful
+and allowed me to continue Neovim contributions(in a healthy way) for the past 5
+months, thank you!
+
+### Building Neovim from source
+
+Did we ever mention how easy it is to build and install Neovim from source?
+While it has a good number of dependencies, the build system automatically
+downloads and builds everything without cluttering your system. Here's a quick
+tutorial on how to install Neovim on a unix system that has git, cmake, gnu
+autotools and a recent version of GCC:
+
+```sh
+git clone https://github.com/neovim/neovim
+cd neovim
+git checkout 0.1   # optional step
+make CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$HOME/.neovim" install
+sudo ln -s $HOME/.neovim/bin/nvim /usr/local/bin/nvim
+```
+
+And uninstalling:
+
+```sh
+rm -rf $HOME/.neovim
+sudo rm /usr/local/bin/nvim
+```
+
+That's it, go try it yourself!
+
+## Development News
+
+### SHADA(SHAred DAta)
+
+@ZyX-I is working on a [major PR][shada-pr] that will completely replace the
+viminfo file for storing user data such as register contents, command history,
+variables, jump list and so on.
+
+A [known problem][shada-proposal] with viminfo is that two Vim instances running
+concurrently will override each other's data. SHADA is a new storage format
+created by @ZyX-I that will bring a number of enhancements to Neovim:
+
+- Structured standardized file format based on msgpack, allowing easier creation
+  of plugins/tools that perform arbitrary manipulation in any language that
+  supports msgpack.
+- Binary serialization format allows efficient/safe storage of arbitrary data.
+- Multiple Neovim instances will be able to share data in real time:
+  - Command history
+  - Register contents. eg: yank in one instance and paste in another. This is
+    already possible with the clipboard register, but this may not be available
+    in certain environments.
+
+While the [PR][shada-pr] is very big, @ZyX-I has taken care of adding great test
+coverage. Great work @ZyX-I!
+
+
+### Wrapping the event loop layer
+
+It's no secret that libuv is the event loop library used by Neovim, and it is
+what makes it possible for us to implement features that require asynchronous
+communication(not initiated by the user) with the editor with ease.
+Unfortunately due to how Neovim code is currently organized, integrating the
+existing code with libuv was not a trivial task.
+
+The basic idea is that Neovim receives arbitrary events when it is polling for
+user input, but these events can't be processed immediately because Neovim can
+be in a state that simply can't handle arbitrary actions. So if Neovim receives
+an event while checking user input, it will put the event in a queue for later
+processing.
+
+One example is illustrated in the following scenario: Neovim checks if the user
+typed ctrl+c while the regexp engine is executing, but it can't process the
+event as it is received because it may want to execute vimscript that calls the
+regexp engine again, and the engine is not reentrant since it relies heavily on
+global variables. So it has to postpone the event for when it's safe, and
+determining when it's safe to process events is itself another problem.
+
+Another complication of integrating with libuv is that sometimes Neovim must
+only process events from a certain source. For example, when Neovim sends a
+msgpack-rpc call, it should only process events that come from:
+
+- the user(eg: ctrl+c to interrupt the call)
+- the file descriptor that received the msgpack-rpc call(which can be from a child
+  process stdio from a socket)
+
+To allow this kind of selective event processing, Neovim must maintain multiple
+queues that integrate with each other, and the logic to do this is very
+repetitive. In one of my [latest PRs][event-loop-pr], some libuv "classes" were
+wrapped in a way that makes managing these queues much easier.
+
+### Jemalloc
+
+[jemalloc][jemalloc], a high performance general purpose memory allocator, is
+now used by default. Since Neovim makes heavy use of dynamic queues(see above),
+it relies on `malloc(3)` a lot more than Vim, so it is important to use a fast
+implementation that has consistent performance across platforms.
+
+In a recent [pr][jemalloc-4-pr], @fwalch modified upgraded the jemalloc version
+used by our build system to target jemalloc 4.0 which brings even more
+performance enhancements and adds support for more platforms.
+
+### XDG Support
+
+Neovim will support the XDG directory specification. This was
+[proposed][xdg-proposal] by @ZyX-I when the project started, but only a couple
+of months ago we received a [pr][xdg-pr1] from @Yamakaky which was superseded by
+@jck in a [later pr][xdg-pr2].
+
+Following XDG directory specification will let Neovim users to store configuration
+files such as `.nvimrc` and those under `~/.nvim` in the `~/.config` directory,
+which can be overriden by the `$XDG_CONFIG_HOME` environment variable. The
+specification also states that cache files should be stored in a separate
+directory(`~/.local/share`), which is where files like viminfo(now SHADA) or
+backup/swap can optionally go.
+
+This change makes it simpler for users to backup and manage their configuration
+since it will be stored with other programs that also follow the specification.
+It also keeps the home directory cleaner
+
+### Faster travis builds
+
+We now use [Travis container-based insfrastructure][travis-container] to run
+Neovim builds, which makes CI builds to start immediately. This was
+[implemented][container-pr] by @fwalch, which also did many other improvements
+to our build infrastructure, allowing developers to receive much faster
+feedback when submitting PRs.
+
+### Quickbuild
+
+@jszakmeister is running a [quickbuild][quickbuild] server in his own
+infrastructure. This gives us a backup CI that double checks Neovim PRs, also
+running tests in FreeBSD which is not covered by travis. Thank you for improving
+Neovim robustness @jszakmeister!
+
+## Third-party development
+
+### Neomake
+
+Did you know that there is an alternative to [syntastic][syntastic] that makes
+use of Neovim asynchronous capabilities? [Neomake][neomake] is the best plugin
+for syntatic checking on Neovim: It is extensible like [syntastic][syntastic]
+and the fact that it uses [job-control][job-control] allows it to perform
+checking in background without blocking the user interface. This is very useful
+for compiled languages that are slower to check(typescript, java, .NET).
+
+The migration from [syntastic][syntastic] is also very trivial, great work
+@benekastah!
+
+### FZF
+
+[fzf][fzf] is a command-line fuzzy finder that thanks to its author(@junnegun,
+the same developer behind [vim-plug][vim-plug]), has great Neovim support
+through a plugin that uses our [builtin terminal emulator][terminal-emulator].
+
+FZF is a great alternative to plugins like [ctrlp][ctrlp]: It really fast and
+has the advantage of running in another process, which can make use of
+multi-core systems and doesn't block Neovim user interface. To see how fast and
+responsive it is, just try running `:FZF` to search for files on the linux
+source tree!
+
+### Deoplete
+
+@Shougo has created [deoplete.nvim][deoplete], an asynchronous completion engine
+written as a [remote-plugin][remote-plugin] that makes use of Neovim async
+capabilities to allow completions to be computed without blocking the user
+interface. @Shougo is the sith lord of Vim plugins, here's a list containing
+some of his previous work:
+
+- [neocomplcache][neocomplcache]
+- [vimshell][vimshell]
+- [unite][unite]
+- [neobundle][neobundle]
+
+Which means the community can expect great things from [deoplete.nvim][deoplete]!
+
+### Neoterm
+
+[Neoterm][neoterm] is a plugin for easily running tests in a [terminal
+window][terminal-emulator]. It was written by @kassio and supports the following
+test libraries:
+
+- rspec
+- cucumber
+- minitest
+- go-lang test
+- node
+
+Very useful @kassio!
+
+[terminal-emulator]: https://neovim.io/doc/user/nvim_terminal_emulator.html#nvim-terminal-emulator
+[0.1-milestone]: https://github.com/neovim/neovim/milestones/0.1-first-public-release
+[history-of-salt]: https://en.wikipedia.org/wiki/History_of_salt
+[first-campaign]: https://www.bountysource.com/teams/neovim
+[salt-campaign]: https://salt.bountysource.com/teams/neovim
+[shada-proposal]: https://github.com/neovim/neovim/issues/999
+[shada-pr]: https://github.com/neovim/neovim/pull/2506
+[event-loop-pr]: https://github.com/neovim/neovim/pull/2980
+[jemalloc]: http://www.canonware.com/jemalloc/
+[jemalloc-4-pr]: https://github.com/neovim/neovim/pull/3289
+[xdg-pr1]: https://github.com/neovim/neovim/pull/3120
+[xdg-pr2]: https://github.com/neovim/neovim/pull/3198
+[xdg-proposal]: https://github.com/neovim/neovim/issues/78
+[travis-container]: http://docs.travis-ci.com/user/workers/container-based-infrastructure/
+[container-pr]: https://github.com/neovim/neovim/pull/2938
+[quickbuild]: http://freecode.com/projects/quickbuild
+[syntastic]: https://github.com/scrooloose/syntastic
+[neomake]: https://github.com/benekastah/neomake
+[job-control]: https://neovim.io/doc/user/job_control.html#job-control
+[deoplete]: https://github.com/Shougo/deoplete.nvim
+[neoterm]: https://github.com/kassio/neoterm
+[remote-plugin]: https://neovim.io/doc/user/remote_plugin.html#remote-plugin
+[vimshell]: https://github.com/Shougo/vimshell.vim
+[unite]: https://github.com/Shougo/Unite.vim
+[neocomplcache]: https://github.com/Shougo/neocomplcache.vim
+[neobundle]: https://github.com/Shougo/neobundle.vim
+[fzf]: https://github.com/junegunn/fzf
+[vim-plug]: https://github.com/junegunn/vim-plug
+[ctrlp]: https://github.com/kien/ctrlp.vim
+[windows-instrutions]: https://github.com/neovim/neovim/wiki/Installing-Neovim#windows
+[neovim-qt]: https://github.com/equalsraf/neovim-qt
+
