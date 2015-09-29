@@ -26,14 +26,20 @@ greatly helped us focus on more urgent tasks that resulted in the first release.
 We planned many features not yet available in 0.1, but decided to postpone them
 for future milestones, which will be more frequent after this newsletter.
 
-This illustrates the path Neovim will take for now on: Instead of preparing
+This illustrates the path Neovim will take from now on: Instead of preparing
 big releases that take forever to happen, we'll focus on smaller, frequent and
 more stable releases.
 
-The 0.1 release is basically just a tag that users looking to compile Neovim in
+The 0.1 release is basically just a tag for users looking to compile Neovim in
 a version that has a minimum level of stability, but future releases may also
-contain precompiled binaries and even installers(when Windows is officially
-supported)
+contain precompiled binaries and even installers (when Windows is officially
+supported).
+
+Neovim 0.1 is already available for [Homebrew/Linuxbrew][homebrew-formula] and
+[Arch Linux][archlinux-pkgbuild]. Check the
+[installation page on the Neovim Wiki][installing-neovim-package] for more
+possibilities to install Neovim (although, at the time of writing, most of these
+will install the latest development version of Neovim instead of the 0.1 release).
 
 ### Bountysource salt campaign
 
@@ -53,37 +59,20 @@ me to test the salt platform beta version and I saw it as a way to continue my
 work on Neovim.
 
 Like it's predecessor, [the salt campaign][salt-campaign] was very successful
-and allowed me to continue Neovim contributions(in a healthy way) for the past 5
+and allowed me to continue Neovim contributions (in a healthy way) for the past 5
 months, thank you!
 
 ### Building Neovim from source
 
 Did we ever mention how easy it is to build and install Neovim from source?
 While it has a good number of dependencies, the build system automatically
-downloads and builds everything without cluttering your system. Here's a quick
-tutorial on how to install Neovim on a unix system that has git, cmake, gnu
-autotools and a recent version of GCC:
-
-```sh
-git clone https://github.com/neovim/neovim
-cd neovim
-git checkout 0.1   # optional step
-make CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$HOME/.neovim" install
-sudo ln -s $HOME/.neovim/bin/nvim /usr/local/bin/nvim
-```
-
-And uninstalling:
-
-```sh
-rm -rf $HOME/.neovim
-sudo rm /usr/local/bin/nvim
-```
-
-That's it, go try it yourself!
+downloads and builds everything without cluttering your system. Check out
+the [installation page on the Neovim Wiki][installing-neovim-source] for the
+exact steps.
 
 ## Development News
 
-### ShaDa(Shared Data)
+### ShaDa (Shared Data)
 
 @ZyX-I is working on a [major PR][shada-pr] that will completely replace the
 viminfo file for storing user data such as register contents, command history,
@@ -98,7 +87,7 @@ enhancements to Neovim:
     - Supports forward (ShaDa files from newer NeoVim can be used by older
       versions) and backward (ShaDa files from older versions can be used by
       newer ones without problems) compatibility, making ShaDa files
-      future-proof to a great extent;
+      future-proof to a great extent.
     - Supports hierarchical data structures, giving Neovim lot of flexibility in
       serializing any kind of information.
     - Is based on msgpack and explicitly standardized in documentation which
@@ -122,7 +111,7 @@ coverage. Great work @ZyX-I!
 
 It's no secret that libuv is the event loop library used by Neovim, and it is
 what makes it possible for us to implement features that require asynchronous
-communication(not initiated by the user) with the editor with ease.
+communication (not initiated by the user) with the editor with ease.
 Unfortunately due to how Neovim code is currently organized, integrating libuv
 was not a trivial task.
 
@@ -143,8 +132,8 @@ Another complication of integrating with libuv is that sometimes Neovim must
 only process events from a certain source. For example, while Neovim is sending
 a msgpack-rpc call, it should only process events that come from:
 
-- the user(eg: ctrl+c to interrupt the call)
-- the file descriptor that received the msgpack-rpc call(which can be from a child
+- the user (eg: ctrl+c to interrupt the call)
+- the file descriptor that received the msgpack-rpc call (which can be from a child
   process stdio from a socket)
 
 To allow this kind of selective event processing, Neovim must maintain multiple
@@ -152,15 +141,15 @@ queues that integrate with each other, and the logic to do this is very
 repetitive. In one of my [latest PRs][event-loop-pr], some libuv "classes" were
 wrapped in a way that makes managing these queues much easier.
 
-### Jemalloc
+### jemalloc
 
 [jemalloc][jemalloc], a high performance general purpose memory allocator, is
-now used by default. Since Neovim makes heavy use of dynamic queues(see above)
+now used by default. Since Neovim makes heavy use of dynamic queues (see above)
 in its inner loops, `malloc(3)` is called a lot more than Vim, so it is
 important to use a fast implementation that has consistent performance across
 platforms.
 
-In a recent [pr][jemalloc-4-pr], @fmoralesc modified the jemalloc version used
+In a recent [PR][jemalloc-4-pr], @fmoralesc modified the jemalloc version used
 by our build system to target jemalloc 4.0 which brings even more performance
 enhancements and adds support for more platforms.
 
@@ -168,14 +157,14 @@ enhancements and adds support for more platforms.
 
 Neovim will support the XDG directory specification. This was
 [proposed][xdg-proposal] by @ZyX-I when the project started, but only a couple
-of months ago we received a [pr][xdg-pr1] from @Yamakaky which was superseded by
-@jck in a [later pr][xdg-pr2].
+of months ago we received a [PR][xdg-pr1] from @Yamakaky which was superseded by
+@jck in a [later PR][xdg-pr2].
 
 Following XDG directory specification will let Neovim users to store configuration
 files such as `.nvimrc` and those under `~/.nvim` in the `~/.config` directory,
 which can be overriden by the `$XDG_CONFIG_HOME` environment variable. The
 specification also states that cache files should be stored in a separate
-directory(`~/.local/share`), which is where files like viminfo(now ShaDa) or
+directory (`~/.local/share`), which is where files like viminfo (now ShaDa) or
 backup/swap can optionally go.
 
 This change makes it simpler for users to backup and manage their configuration
@@ -206,14 +195,14 @@ use of Neovim asynchronous capabilities? [Neomake][neomake] is the best plugin
 for syntatic checking on Neovim: It is extensible like [syntastic][syntastic]
 and the fact that it uses [job-control][job-control] allows it to perform
 checking in background without blocking the user interface. This is very useful
-for compiled languages that are slower to check(typescript, java, .NET).
+for compiled languages that are slower to check (typescript, java, .NET).
 
 The migration from [syntastic][syntastic] is also very trivial, great work
 @benekastah!
 
 ### FZF
 
-[fzf][fzf] is a command-line fuzzy finder that thanks to its author(@junnegun,
+[fzf][fzf] is a command-line fuzzy finder that thanks to its author (@junnegun,
 the same developer behind [vim-plug][vim-plug]), has great Neovim support
 through a plugin that uses our [builtin terminal emulator][terminal-emulator].
 
@@ -283,4 +272,8 @@ Very useful @kassio!
 [ctrlp]: https://github.com/kien/ctrlp.vim
 [windows-instrutions]: https://github.com/neovim/neovim/wiki/Installing-Neovim#windows
 [neovim-qt]: https://github.com/equalsraf/neovim-qt
+[homebrew-formula]: https://github.com/neovim/homebrew-neovim
+[archlinux-pkgbuild]: https://aur.archlinux.org/packages/neovim
+[installing-neovim-package]: https://github.com/neovim/neovim/wiki/Installing-Neovim#install-from-package
+[installing-neovim-source]: https://github.com/neovim/neovim/wiki/Installing-Neovim#install-from-source
 
